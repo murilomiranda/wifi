@@ -1,0 +1,31 @@
+---
+title: "Wi-Fi Locationing"
+author: "Murilo Miranda"
+date: "3/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+
+
+## Preprocessing
+
+
+
+## Models {.tabset .tabset-fade .tabset-pills}
+### kNN
+text 1
+
+### Decision Tree
+text 2
+
+### Random Forest
+text 3
+
+### Support Vector
+test 4
