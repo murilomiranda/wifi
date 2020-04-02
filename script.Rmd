@@ -2,30 +2,247 @@
 title: "Wi-Fi Locationing"
 author: "Murilo Miranda"
 date: "3/30/2020"
-output: html_document
+output:
+  html_document:
+    toc: true # table of content true
+    toc_float: true
+    code_folding: hide
+    toc_depth: 2  # upto three depths of headings (specified by #, ## and ###)
+    theme: united
+    highlight: breezedark  # specifies the syntax highlighting style
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r, warning=FALSE, message=FALSE}
+library(here)
+library(scatterplot3d)
+library(tidyverse)
+library(caret)
+```
+
 ## Introduction
 
+Our client is developing a system to be deployed on large industrial campuses, in shopping malls, et cetera to help people to navigate a complex, unfamiliar interior space without getting lost. While GPS works fairly reliably outdoors, it generally doesn't work indoors, so a different technology is necessary. Our client would like us to investigate the feasibility of using "wifi fingerprinting" to determine a person's location in indoor spaces. Wifi fingerprinting uses the signals from multiple wifi hotspots within the building to determine location, analogously to how GPS uses satellite signals. We have been provided with a large database of wifi fingerprints for a multi-building industrial campus with a location (building, floor, and location ID) associated with each fingerprint. 
 
+The goal is to evaluate multiple machine learning models to see which produces the best result, enabling us to make a recommendation to the client.
+
+## Load datasets
+```{r}
+trainingData <- read.csv(here("/data/trainingData.csv"))
+validationData <- read.csv(here("/data/validationData.csv"))
+
+str(trainingData[, c(1:3, 519:529)])
+```
 
 ## Preprocessing
 
+### Convert data types
+```{r}
+# convert features to numeric
+trainingData <- sapply(trainingData, as.numeric)
+  
+trainingData <- as_tibble(trainingData)
+```
+
+### Impute NA's
+```{r}
+# convert NA's to -110
+trainingData[trainingData == 100] <- -110
+```
+
+### Remove features and Rows with all NA's
+```{r}
+# remove features with all data is NA's
+trainingData <- trainingData[, colSums(trainingData == -110) < nrow(trainingData)]
+
+# remove rows with all data is NA's
+trainingData <- trainingData[rowSums(trainingData == -110) != ncol(trainingData), ]
+```
+
+### Create unique identifier
+```{r}
+# consolidate position identifiers to create location ID feature
+trainingData$ID <- trainingData %>%
+  group_indices(BUILDINGID, FLOOR)
+```
+
+```{r}
+# convert features to categorical
+trainingData <- trainingData %>% 
+  mutate(BUILDINGID = as.factor(BUILDINGID),
+         SPACEID = as.factor(SPACEID),
+         RELATIVEPOSITION = as.factor(RELATIVEPOSITION),
+         FLOOR = as.factor(FLOOR),
+         ID = as.factor(ID))
+```
 
 
-## Models {.tabset .tabset-fade .tabset-pills}
-### kNN
-text 1
+```{r}
+# 3D image of reference point locations in data set
+scatterplot3d(trainingData$LONGITUDE, trainingData$LATITUDE, trainingData$FLOOR,
+              type = 'p',
+              highlight.3d = FALSE,
+              color = 'red',
+              angle = 200,
+              scale.y = 0.9,
+              pch = 20,
+              box = FALSE,
+              xlab = 'Longitude', ylab='Latitude',zlab = 'Building Floor') 
+```
+
+
+## Training with different models 
+### Set some parameters up
+
+```{r}
+# remove unneeded features prior to model fitting
+wifi_train <- trainingData %>% 
+  select(starts_with("WAP"), ID)
+```
+
+```{r}
+# Randomly select - sample fixed fraction per group
+wifi_train <- wifi_train %>% sample_frac(size = 0.1, weight = ID)
+```
+
+```{r}
+# define parameters in trainControl
+fitControl <- trainControl(method = "cv", 
+                           number = 10,
+                           p = 0.75)
+```
+
+### Models
+```{r}
+methods <- c("knn", "C5.0", "ranger", "rf", "svmLinear", "svmRadial")
+
+compare_methods <- c()
+
+for(i in methods){
+  set.seed(1605)
+  model <- train(ID ~ ., data = wifi_train, method = i, 
+                 preProcess = c('zv', 'pca'),
+                 trControl = fitControl)
+  
+  pred <- predict(model, newdata = wifi_test)
+  pred_metric <- postResample(wifi_test$ID, pred)
+  compare_model <- cbind(compare_model, pred_metric)
+}
+
+colnames(compare_model) <- methods
+
+compare_model
+# fit kNN model
+# set.seed(1605)
+ 
+# grid of k values to search 
+# knn_grid <- expand.grid(.k = c(1:5))
+  
+# train kNN model
+# knn_fit <- train(ID ~ ., data = wifi_train, method = 'knn', 
+#                 preProcess = c('zv', 'pca'), 
+#                 tuneGrid = knn_grid,
+#                 trControl = fitControl)
+  
+# save model
+# saveRDS(knn_fit, 'knn_fit.rds')
+
+# read in model
+knn_fit <- readRDS('knn_fit.rds')
+```
+
+```{r}
+plot(knn_fit)
+
+knn_fit$results
+```
 
 ### Decision Tree
-text 2
+```{r}
+# fit decision tree (C5.0) model
+# set.seed(1605)
+  
+# train decision tree model
+# dtree_fit <- train(ID ~ ., data = wifi_train, method = 'C5.0',
+#                   preProcess = c('zv', 'pca'),
+#                   trControl = fitControl)
+  
+# save model
+# saveRDS(dtree_fit, 'dtree_fit.rds')
+
+# read in decision tree model
+dtree_fit <- readRDS('dtree_fit.rds')
+```
+
+```{r}
+plot(dtree_fit)
+
+dtree_fit$results
+```
 
 ### Random Forest
-text 3
+```{r}
+# fit Random Forest model
+# set.seed(1605)
+  
+# train Random Forest model
+# rf_fit <- train(ID ~ ., data = wifi_train, method='ranger', 
+#                preProcess = c('zv', 'pca'),
+#                trControl = fitControl)
+  
+# save model
+# saveRDS(rf_fit, 'rf_fit.rds')
 
-### Support Vector
-test 4
+# read in Random Forest model
+rf_fit <- readRDS('rf_fit.rds')
+```
+
+```{r}
+plot(rf_fit)
+
+rf_fit$results
+```
+
+### Support Vector Machines
+```{r}
+# fit Support Vector Machines model
+# set.seed(1605)
+  
+# train SVM model
+# svm_fit <- train(ID ~ ., data = wifi_train, method='svmLinear', 
+#                preProcess = c('zv', 'pca'),
+#                trControl = fitControl)
+  
+# save model
+# saveRDS(svm_fit, 'svm_fit.rds')  
+
+# read in support vector machines model
+svm_fit <- readRDS('svm_fit.rds')
+```
+
+```{r}
+svm_fit$results
+```
+
+## Comparing Models
+```{r}
+# summarize results
+results <- resamples(list(kNN = knn_fit,
+                          rf = rf_fit, 
+                          dtree = dtree_fit,
+                          svm = svm_fit))
+summary(results)
+```
+
+```{r}
+bwplot(results)
+```
+
+## Ensemble Models {.tabset .tabset-fade .tabset-pills}
+### Classification
+
+### Regression
+
