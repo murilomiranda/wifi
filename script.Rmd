@@ -18,9 +18,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, warning=FALSE, message=FALSE}
 library(here)
+library(tictoc)
+library(knitr)
 library(scatterplot3d)
 library(tidyverse)
 library(caret)
+library(e1071)
 ```
 
 ## Introduction
@@ -79,7 +82,6 @@ trainingData <- trainingData %>%
          ID = as.factor(ID))
 ```
 
-
 ```{r}
 # 3D image of reference point locations in data set
 scatterplot3d(trainingData$LONGITUDE, trainingData$LATITUDE, trainingData$FLOOR,
@@ -93,156 +95,431 @@ scatterplot3d(trainingData$LONGITUDE, trainingData$LATITUDE, trainingData$FLOOR,
               xlab = 'Longitude', ylab='Latitude',zlab = 'Building Floor') 
 ```
 
-
-## Training with different models 
+## Training with different models
 ### Set some parameters up
 
 ```{r}
+# define parameters in trainControl
+fitControl <- trainControl(method = "cv", number = 10)
+```
+
+### Models
+#### Classification
+```{r}
 # remove unneeded features prior to model fitting
-wifi_train <- trainingData %>% 
+partTrainingData <- trainingData %>% 
   select(starts_with("WAP"), ID)
 ```
 
 ```{r}
 # Randomly select - sample fixed fraction per group
-wifi_train <- wifi_train %>% sample_frac(size = 0.1, weight = ID)
+set.seed(1605)
+partTrainingData <- partTrainingData %>% sample_frac(size = 0.1, weight = ID)
 ```
 
 ```{r}
-# define parameters in trainControl
-fitControl <- trainControl(method = "cv", 
-                           number = 10,
-                           p = 0.75)
+#
+set.seed(1605)
+in_training <- createDataPartition(partTrainingData$ID, p = 0.7, list = F)
+
+wifi_train <- partTrainingData[in_training,]
+wifi_test <- partTrainingData[-in_training,]
 ```
 
-### Models
+##### Pre-test with Principal Components Analysis
+###### Classification
 ```{r}
-methods <- c("knn", "C5.0", "ranger", "rf", "svmLinear", "svmRadial")
+# create train and test sets for pca
+wifi_train_pca <- partTrainingData[in_training,]
+wifi_test_pca <- partTrainingData[-in_training,]
 
-compare_methods <- c()
+# Remove columns with zero variance
+rm_variables <- as.numeric(which(apply(wifi_train_pca, 2, var) == 0))
+wifi_train_pca <- wifi_train_pca[-rm_variables]
+wifi_test_pca <- wifi_test_pca[-rm_variables]
+```
 
-for(i in methods){
-  set.seed(1605)
-  model <- train(ID ~ ., data = wifi_train, method = i, 
-                 preProcess = c('zv', 'pca'),
-                 trControl = fitControl)
-  
-  pred <- predict(model, newdata = wifi_test)
-  pred_metric <- postResample(wifi_test$ID, pred)
-  compare_model <- cbind(compare_model, pred_metric)
-}
+```{r}
+pca_train <- wifi_train_pca %>% select(-ID)
+pca_test <- wifi_test_pca %>% select(-ID)
 
-colnames(compare_model) <- methods
+pca <- prcomp(pca_train, scale = TRUE)
 
-compare_model
-# fit kNN model
+# variance
+pr_var <- (pca$sdev)^2 
+
+# % of variance
+prop_varex <- pr_var/sum(pr_var)
+
+# Plot
+ggplot(data.frame(prop_varex), aes(x = 1:length(prop_varex), y = cumsum(prop_varex))) + 
+  geom_point() + 
+  labs(x = "Principal Component", 
+       y = "Proportion of Variance Explained") +
+  geom_hline(yintercept = 0.95, colour = "red", linetype = "dashed") +
+  geom_vline(xintercept = 170, colour = "red", linetype = "dashed")
+```
+
+```{r, results='hide'}
+rm(pr_var, rm_variables, prop_varex)
+```
+
+```{r}
+# Creating a new dataset
+new_train <- data.frame(ID = wifi_train_pca$ID, pca$x)
+new_test <- data.frame(ID = wifi_test_pca$ID, predict(pca, newdata = pca_test))
+
+new_train <- new_train[, 1:170]
+new_test <-  new_test[, 1:170]
+```
+
+```{r}
+# apply kNN algorithm
+model_knn <- train(ID ~ ., data = new_train, method = "knn", 
+                   tuneGrid = expand.grid(
+                     k = 1:10
+                   ),
+                   trControl = fitControl)
+   
+pred_knn <- predict(model_knn, newdata = new_test)
+postResample(new_test$ID, pred_knn)
+```
+
+```{r, results='hide'}
+rm(pred_knn, model_knn, new_train, new_test, wifi_test_pca, wifi_train_pca, pca,
+   pca_test, pca_train)
+```
+
+### Applied pre-build functions
+#### Classification
+```{r}
+# methods <- c("knn", "C5.0", "ranger", "rf", "svmLinear", "svmRadial")
+# 
+# compare_methods <- c()
+# 
+# tic("Total")
+# for(i in methods){
+#   tic(paste("Method", i))
+#   set.seed(1605)
+#   model <- train(ID ~ ., data = wifi_train, method = i, 
+#                  preProcess = c('zv', 'pca'),
+#                  trControl = fitControl)
+#   
+#   pred <- predict(model, newdata = wifi_test)
+#   pred_metric <- postResample(wifi_test$ID, pred)
+#   compare_methods <- cbind(compare_methods, pred_metric)
+#   toc()
+# }
+# toc()
+# 
+# colnames(compare_methods) <- methods
+
+# saveRDS(compare_methods, "compare_methods.rds")
+```
+
+#### Regression
+```{r}
+# remove unneeded features prior to model fitting
+longTrainingData <- trainingData %>% 
+  select(starts_with("WAP"), LONGITUDE, FLOOR)
+
+latTrainingData <- trainingData %>% 
+  select(starts_with("WAP"), LATITUDE, FLOOR)
+```
+
+```{r}
+# Randomly select - sample fixed fraction per group
+set.seed(1605)
+longTrainingData <- longTrainingData %>% sample_frac(size = 0.1)
+
+set.seed(1605)
+latTrainingData <- latTrainingData %>% sample_frac(size = 0.1)
+```
+
+##### Longitude
+```{r}
+#
 # set.seed(1605)
- 
-# grid of k values to search 
-# knn_grid <- expand.grid(.k = c(1:5))
+# in_training <- createDataPartition(longTrainingData$LONGITUDE, p = 0.7, list = F)
+# 
+# wifi_train <- longTrainingData[in_training,]
+# wifi_test <- longTrainingData[-in_training,]
+```
+
+```{r}
+# methods <- c("knn", "rpart", "ranger", "rf", "svmLinear", "svmRadial", "gbm")
+# 
+# compare_long <- c()
+# 
+# tic("Total")
+# for(i in methods){
+#   tic(paste("Method", i))
+#   set.seed(1605)
+#   model <- train(LONGITUDE ~ ., data = wifi_train, method = i, 
+#                  preProcess = c('center', 'scale', 'zv', 'pca'),
+#                  trControl = fitControl)
+#   
+#   pred <- predict(model, newdata = wifi_test)
+#   pred_metric <- postResample(wifi_test$LONGITUDE, pred)
+#   compare_long <- cbind(compare_long, pred_metric)
+#   toc()
+# }
+# toc()
+# 
+# colnames(compare_long) <- methods
+
+# saveRDS(compare_long, "compare_long.rds")
+```
+
+##### Longitude
+```{r}
+#
+set.seed(1605)
+in_training <- createDataPartition(latTrainingData$LATITUDE, p = 0.7, list = F)
+
+wifi_train <- latTrainingData[in_training,]
+wifi_test <- latTrainingData[-in_training,]
+```
+
+```{r}
+# methods <- c("knn", "rpart", "ranger", "svmLinear", "svmRadial", "gbm")
+# 
+# compare_lat <- c()
+# 
+# tic("Total")
+# for(i in methods){
+#   tic(paste("Method", i))
+#   set.seed(1605)
+#   model <- train(LATITUDE ~ ., data = wifi_train, method = i, 
+#                  preProcess = c('center', 'scale', 'zv', 'pca'),
+#                  trControl = fitControl)
+#   
+#   pred <- predict(model, newdata = wifi_test)
+#   pred_metric <- postResample(wifi_test$LATITUDE, pred)
+#   compare_lat <- cbind(compare_lat, pred_metric)
+#   toc()
+# }
+# toc()
+# 
+# colnames(compare_lat) <- methods
+
+# saveRDS(compare_lat, "compare_lat.rds")
+```
+
+#### Comparing metrics
+```{r, results='asis'}
+kable(compare_methods <- readRDS("compare_methods.rds"), digits = 3, 
+      caption = "Classification model for buildingID + Floor")
+```
+
+```{r, results='asis'}
+kable(compare_long <- readRDS("compare_long.rds"), digits = 3, 
+      caption = "Regression models for longitude")
+```
+
+```{r, results='asis'}
+kable(compare_lat <- readRDS("compare_lat.rds"), digits = 3, 
+      caption = "Regression models for latitude")
+```
+
+#### Comparing time to process
+```{r, results='asis'}
+kable(as.data.frame(cbind("knn" = c(35.22), "C5.0" = c(512.06), 
+                    "ranger" = c(389.30), "rf" = c(364.67), 
+                    "smvLinear" = c(21.30), "smvRadial" = c(132.00))),
+      digits = 2, caption = "Classification (time in seconds)")
+```
+
+```{r, results='asis'}
+kable(as.data.frame(cbind("knn" = c(38.24), "rpart" = c(16.48), 
+                    "ranger" = c(398.94), "rf" = c(1885.44), 
+                    "smvLinear" = c(216.67), "smvRadial" = c(55.22), 
+                    "gmb" = c(83.22))),
+      digits = 2, caption = "Regression longitude (time in seconds)")
+```
+
+```{r, results='asis'}
+kable(as.data.frame(cbind("knn" = c(42.41), "rpart" = c(16.08), 
+                    "ranger" = c(406.76), "smvLinear" = c(212.99),
+                    "smvRadial" = c(66.28), "gmb" = c(84.06))),
+      digits = 2, caption = "Regression for latitude (time in seconds)")
+```
+
+
+### Final Models
+#### Classification
+```{r}
+# remove unneeded features prior to model fitting
+partTrainingData <- trainingData %>% 
+  select(starts_with("WAP"), ID)
+```
+
+```{r}
+# Randomly select - sample fixed fraction per group
+set.seed(1605)
+partTrainingData <- partTrainingData %>% sample_frac(size = 0.3, weight = ID)
+```
+
+```{r}
+#
+set.seed(1605)
+in_training <- createDataPartition(partTrainingData$ID, p = 0.7, list = F)
+
+wifi_train <- partTrainingData[in_training,]
+wifi_test <- partTrainingData[-in_training,]
+```
+
+```{r}
+# apply kNN algorithm
+tic("kNN")
+set.seed(1605)
+model_knn <- train(ID ~ ., data = wifi_train, method = "knn", 
+                   preProcess = c('zv', 'pca'),
+                   tuneGrid = expand.grid(k = 1:10),
+                   trControl = fitControl)
+toc()
+
+pred_knn <- predict(model_knn, newdata = wifi_test)
+postResample(wifi_test$ID, pred_knn)
+```
+
+
+#### Regression
+```{r}
+# remove unneeded features prior to model fitting
+longTrainingData <- trainingData %>% 
+  select(starts_with("WAP"), LONGITUDE, FLOOR)
+
+latTrainingData <- trainingData %>% 
+  select(starts_with("WAP"), LATITUDE, FLOOR)
+```
+
+```{r}
+# Randomly select - sample fixed fraction per group
+set.seed(1605)
+longTrainingData <- longTrainingData %>% sample_frac(size = 0.3)
+
+set.seed(1605)
+latTrainingData <- latTrainingData %>% sample_frac(size = 0.3)
+```
+
+##### Longitude
+```{r}
+#
+set.seed(1605)
+in_training <- createDataPartition(longTrainingData$LONGITUDE, p = 0.7, list = F)
+
+wifi_train <- longTrainingData[in_training,]
+wifi_test <- longTrainingData[-in_training,]
+```
+
+```{r}
+tic("kNN")
+set.seed(1605)
+model <- train(LONGITUDE ~ ., data = wifi_train, method = "knn",
+               preProcess = c('center', 'scale', 'zv', 'pca'),
+               trControl = fitControl)
+toc()
+
+pred <- predict(model, newdata = wifi_test)
+postResample(wifi_test$LONGITUDE, pred)
+
+
+# saveRDS(compare_long, "compare_long.rds")
+```
+
+##### Latitude
+```{r}
+#
+set.seed(1605)
+in_training <- createDataPartition(latTrainingData$LATITUDE, p = 0.7, list = F)
+
+wifi_train <- latTrainingData[in_training,]
+wifi_test <- latTrainingData[-in_training,]
+```
+
+```{r}
+tic("kNN")
+set.seed(1605)
+model_lat <- train(LATITUDE ~ ., data = wifi_train, method = "knn",
+                   preProcess = c('center', 'scale', 'zv', 'pca'),
+                   trControl = fitControl)
+toc()
+
+pred <- predict(model_lat, newdata = wifi_test)
+postResample(wifi_test$LATITUDE, pred)
+
+# saveRDS(compare_lat, "compare_lat.rds")
+```
+
+#### Validation
+###### Convert data types
+```{r}
+# convert features to numeric
+validationData <- sapply(validationData, as.numeric)
   
-# train kNN model
-# knn_fit <- train(ID ~ ., data = wifi_train, method = 'knn', 
-#                 preProcess = c('zv', 'pca'), 
-#                 tuneGrid = knn_grid,
-#                 trControl = fitControl)
-  
-# save model
-# saveRDS(knn_fit, 'knn_fit.rds')
+validationData <- as_tibble(validationData)
+```
 
-# read in model
-knn_fit <- readRDS('knn_fit.rds')
+###### Impute NA's
+```{r}
+# convert NA's to -110
+validationData[validationData == 100] <- -110
+```
+
+###### Remove features and Rows with all NA's
+```{r}
+# remove rows with all data is NA's
+validationData <- validationData[rowSums(validationData == -110) != ncol(validationData), ]
+```
+
+###### Create unique identifier
+```{r}
+# consolidate position identifiers to create location ID feature
+validationData$ID <- validationData %>%
+  group_indices(BUILDINGID, FLOOR)
 ```
 
 ```{r}
-plot(knn_fit)
-
-knn_fit$results
+# convert features to categorical
+validationData <- validationData %>% 
+  mutate(BUILDINGID = as.factor(BUILDINGID),
+         SPACEID = as.factor(SPACEID),
+         RELATIVEPOSITION = as.factor(RELATIVEPOSITION),
+         FLOOR = as.factor(FLOOR),
+         ID = as.factor(ID))
 ```
 
-### Decision Tree
+##### Classification
 ```{r}
-# fit decision tree (C5.0) model
-# set.seed(1605)
-  
-# train decision tree model
-# dtree_fit <- train(ID ~ ., data = wifi_train, method = 'C5.0',
-#                   preProcess = c('zv', 'pca'),
-#                   trControl = fitControl)
-  
-# save model
-# saveRDS(dtree_fit, 'dtree_fit.rds')
-
-# read in decision tree model
-dtree_fit <- readRDS('dtree_fit.rds')
+# remove unneeded features prior to model fitting
+classValidationData <- validationData %>% 
+  select(starts_with("WAP"), ID)
 ```
 
 ```{r}
-plot(dtree_fit)
-
-dtree_fit$results
+pred_class <- predict(model_knn, newdata = classValidationData)
+postResample(classValidationData$ID, pred_class)
 ```
 
-### Random Forest
+
+##### Regression
 ```{r}
-# fit Random Forest model
-# set.seed(1605)
-  
-# train Random Forest model
-# rf_fit <- train(ID ~ ., data = wifi_train, method='ranger', 
-#                preProcess = c('zv', 'pca'),
-#                trControl = fitControl)
-  
-# save model
-# saveRDS(rf_fit, 'rf_fit.rds')
+# remove unneeded features prior to model fitting
+longValidationData <- validationData %>% 
+  select(starts_with("WAP"), LONGITUDE, FLOOR)
 
-# read in Random Forest model
-rf_fit <- readRDS('rf_fit.rds')
+pred <- predict(model, newdata = longValidationData)
+postResample(longValidationData$LONGITUDE, pred)
+
+latValidationData <- validationData %>% 
+  select(starts_with("WAP"), LATITUDE, FLOOR)
+
+pred <- predict(model_lat, newdata = latValidationData)
+postResample(latValidationData$LATITUDE, pred)
 ```
 
-```{r}
-plot(rf_fit)
 
-rf_fit$results
-```
 
-### Support Vector Machines
-```{r}
-# fit Support Vector Machines model
-# set.seed(1605)
-  
-# train SVM model
-# svm_fit <- train(ID ~ ., data = wifi_train, method='svmLinear', 
-#                preProcess = c('zv', 'pca'),
-#                trControl = fitControl)
-  
-# save model
-# saveRDS(svm_fit, 'svm_fit.rds')  
-
-# read in support vector machines model
-svm_fit <- readRDS('svm_fit.rds')
-```
-
-```{r}
-svm_fit$results
-```
-
-## Comparing Models
-```{r}
-# summarize results
-results <- resamples(list(kNN = knn_fit,
-                          rf = rf_fit, 
-                          dtree = dtree_fit,
-                          svm = svm_fit))
-summary(results)
-```
-
-```{r}
-bwplot(results)
-```
-
-## Ensemble Models {.tabset .tabset-fade .tabset-pills}
-### Classification
-
-### Regression
+## Ensemble Models 
 
