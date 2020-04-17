@@ -1768,6 +1768,8 @@ div.tocify {
 <a class="sourceLine" id="cb13-6" title="6">wifi_test &lt;-<span class="st"> </span>partTrainingData[<span class="op">-</span>in_training,]</a></code></pre></div>
 <div id="pre-test-with-principal-components-analysis" class="section level5">
 <h5>Pre-test with Principal Components Analysis</h5>
+<div id="classification-1" class="section level6">
+<h6>Classification</h6>
 <div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb14-1" title="1"><span class="co"># create train and test sets for pca</span></a>
 <a class="sourceLine" id="cb14-2" title="2">wifi_train_pca &lt;-<span class="st"> </span>partTrainingData[in_training,]</a>
 <a class="sourceLine" id="cb14-3" title="3">wifi_test_pca &lt;-<span class="st"> </span>partTrainingData[<span class="op">-</span>in_training,]</a>
@@ -1818,9 +1820,10 @@ div.tocify {
 </div>
 </div>
 </div>
+</div>
 <div id="applied-pre-build-functions" class="section level3">
 <h3>Applied pre-build functions</h3>
-<div id="classification-1" class="section level4">
+<div id="classification-2" class="section level4">
 <h4>Classification</h4>
 <div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb21-1" title="1"><span class="co"># methods &lt;- c(&quot;knn&quot;, &quot;C5.0&quot;, &quot;ranger&quot;, &quot;rf&quot;, &quot;svmLinear&quot;, &quot;svmRadial&quot;)</span></a>
 <a class="sourceLine" id="cb21-2" title="2"><span class="co"># </span></a>
@@ -2141,6 +2144,163 @@ div.tocify {
 </tr>
 </tbody>
 </table>
+</div>
+</div>
+</div>
+<div id="final-models" class="section level2">
+<h2>Final Models</h2>
+<div id="classification-3" class="section level3">
+<h3>Classification</h3>
+<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb34-1" title="1"><span class="co"># remove unneeded features prior to model fitting</span></a>
+<a class="sourceLine" id="cb34-2" title="2">partTrainingData &lt;-<span class="st"> </span>trainingData <span class="op">%&gt;%</span><span class="st"> </span></a>
+<a class="sourceLine" id="cb34-3" title="3"><span class="st">  </span><span class="kw">select</span>(<span class="kw">starts_with</span>(<span class="st">&quot;WAP&quot;</span>), ID)</a></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb35-1" title="1"><span class="co"># Randomly select - sample fixed fraction per group</span></a>
+<a class="sourceLine" id="cb35-2" title="2"><span class="kw">set.seed</span>(<span class="dv">1605</span>)</a>
+<a class="sourceLine" id="cb35-3" title="3">partTrainingData &lt;-<span class="st"> </span>partTrainingData <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">sample_frac</span>(<span class="dt">size =</span> <span class="fl">0.3</span>, <span class="dt">weight =</span> ID)</a></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb36-1" title="1"><span class="co">#</span></a>
+<a class="sourceLine" id="cb36-2" title="2"><span class="kw">set.seed</span>(<span class="dv">1605</span>)</a>
+<a class="sourceLine" id="cb36-3" title="3">in_training &lt;-<span class="st"> </span><span class="kw">createDataPartition</span>(partTrainingData<span class="op">$</span>ID, <span class="dt">p =</span> <span class="fl">0.7</span>, <span class="dt">list =</span> F)</a>
+<a class="sourceLine" id="cb36-4" title="4"></a>
+<a class="sourceLine" id="cb36-5" title="5">wifi_train &lt;-<span class="st"> </span>partTrainingData[in_training,]</a>
+<a class="sourceLine" id="cb36-6" title="6">wifi_test &lt;-<span class="st"> </span>partTrainingData[<span class="op">-</span>in_training,]</a></code></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb37-1" title="1"><span class="co"># apply kNN algorithm</span></a>
+<a class="sourceLine" id="cb37-2" title="2"><span class="co"># tic(&quot;kNN&quot;)</span></a>
+<a class="sourceLine" id="cb37-3" title="3"><span class="co"># set.seed(1605)</span></a>
+<a class="sourceLine" id="cb37-4" title="4"><span class="co"># model_class &lt;- train(ID ~ ., data = wifi_train, method = &quot;knn&quot;, </span></a>
+<a class="sourceLine" id="cb37-5" title="5"><span class="co">#                    preProcess = c(&#39;zv&#39;, &#39;pca&#39;),</span></a>
+<a class="sourceLine" id="cb37-6" title="6"><span class="co">#                    tuneGrid = expand.grid(k = 1:10),</span></a>
+<a class="sourceLine" id="cb37-7" title="7"><span class="co">#                    trControl = fitControl)</span></a>
+<a class="sourceLine" id="cb37-8" title="8"><span class="co"># toc()</span></a>
+<a class="sourceLine" id="cb37-9" title="9"></a>
+<a class="sourceLine" id="cb37-10" title="10">model_class &lt;-<span class="st"> </span><span class="kw">readRDS</span>(<span class="st">&quot;final_class_model.rds&quot;</span>)</a>
+<a class="sourceLine" id="cb37-11" title="11"></a>
+<a class="sourceLine" id="cb37-12" title="12">pred_class &lt;-<span class="st"> </span><span class="kw">predict</span>(model_class, <span class="dt">newdata =</span> wifi_test)</a>
+<a class="sourceLine" id="cb37-13" title="13"><span class="kw">postResample</span>(wifi_test<span class="op">$</span>ID, pred_class)</a></code></pre></div>
+<pre><code>##  Accuracy     Kappa 
+## 0.9664617 0.9621314</code></pre>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb39-1" title="1"><span class="co"># saveRDS(model_class, &quot;final_class_model.rds&quot;)</span></a></code></pre></div>
+</div>
+<div id="regression-1" class="section level3">
+<h3>Regression</h3>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb40-1" title="1"><span class="co"># remove unneeded features prior to model fitting</span></a>
+<a class="sourceLine" id="cb40-2" title="2">longTrainingData &lt;-<span class="st"> </span>trainingData <span class="op">%&gt;%</span><span class="st"> </span></a>
+<a class="sourceLine" id="cb40-3" title="3"><span class="st">  </span><span class="kw">select</span>(<span class="kw">starts_with</span>(<span class="st">&quot;WAP&quot;</span>), LONGITUDE, FLOOR)</a>
+<a class="sourceLine" id="cb40-4" title="4"></a>
+<a class="sourceLine" id="cb40-5" title="5">latTrainingData &lt;-<span class="st"> </span>trainingData <span class="op">%&gt;%</span><span class="st"> </span></a>
+<a class="sourceLine" id="cb40-6" title="6"><span class="st">  </span><span class="kw">select</span>(<span class="kw">starts_with</span>(<span class="st">&quot;WAP&quot;</span>), LATITUDE, FLOOR)</a></code></pre></div>
+<div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb41-1" title="1"><span class="co"># Randomly select - sample fixed fraction per group</span></a>
+<a class="sourceLine" id="cb41-2" title="2"><span class="kw">set.seed</span>(<span class="dv">1605</span>)</a>
+<a class="sourceLine" id="cb41-3" title="3">longTrainingData &lt;-<span class="st"> </span>longTrainingData <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">sample_frac</span>(<span class="dt">size =</span> <span class="fl">0.3</span>)</a>
+<a class="sourceLine" id="cb41-4" title="4"></a>
+<a class="sourceLine" id="cb41-5" title="5"><span class="kw">set.seed</span>(<span class="dv">1605</span>)</a>
+<a class="sourceLine" id="cb41-6" title="6">latTrainingData &lt;-<span class="st"> </span>latTrainingData <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">sample_frac</span>(<span class="dt">size =</span> <span class="fl">0.3</span>)</a></code></pre></div>
+<div id="longitude-2" class="section level4">
+<h4>Longitude</h4>
+<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb42-1" title="1"><span class="co">#</span></a>
+<a class="sourceLine" id="cb42-2" title="2"><span class="kw">set.seed</span>(<span class="dv">1605</span>)</a>
+<a class="sourceLine" id="cb42-3" title="3">in_training &lt;-<span class="st"> </span><span class="kw">createDataPartition</span>(longTrainingData<span class="op">$</span>LONGITUDE, <span class="dt">p =</span> <span class="fl">0.7</span>, <span class="dt">list =</span> F)</a>
+<a class="sourceLine" id="cb42-4" title="4"></a>
+<a class="sourceLine" id="cb42-5" title="5">wifi_train &lt;-<span class="st"> </span>longTrainingData[in_training,]</a>
+<a class="sourceLine" id="cb42-6" title="6">wifi_test &lt;-<span class="st"> </span>longTrainingData[<span class="op">-</span>in_training,]</a></code></pre></div>
+<div class="sourceCode" id="cb43"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb43-1" title="1"><span class="co"># tic(&quot;kNN&quot;)</span></a>
+<a class="sourceLine" id="cb43-2" title="2"><span class="co"># set.seed(1605)</span></a>
+<a class="sourceLine" id="cb43-3" title="3"><span class="co"># model_long &lt;- train(LONGITUDE ~ ., data = wifi_train, method = &quot;knn&quot;,</span></a>
+<a class="sourceLine" id="cb43-4" title="4"><span class="co">#                preProcess = c(&#39;center&#39;, &#39;scale&#39;, &#39;zv&#39;, &#39;pca&#39;),</span></a>
+<a class="sourceLine" id="cb43-5" title="5"><span class="co">#                trControl = fitControl)</span></a>
+<a class="sourceLine" id="cb43-6" title="6"><span class="co"># toc()</span></a>
+<a class="sourceLine" id="cb43-7" title="7"></a>
+<a class="sourceLine" id="cb43-8" title="8">model_long &lt;-<span class="st"> </span><span class="kw">readRDS</span>(<span class="st">&quot;final_long_model.rds&quot;</span>)</a>
+<a class="sourceLine" id="cb43-9" title="9"></a>
+<a class="sourceLine" id="cb43-10" title="10">pred_long &lt;-<span class="st"> </span><span class="kw">predict</span>(model_long, <span class="dt">newdata =</span> wifi_test)</a>
+<a class="sourceLine" id="cb43-11" title="11"><span class="kw">postResample</span>(wifi_test<span class="op">$</span>LONGITUDE, pred_long)</a></code></pre></div>
+<pre><code>##       RMSE   Rsquared        MAE 
+## 12.3048624  0.9899932  4.7718008</code></pre>
+<div class="sourceCode" id="cb45"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb45-1" title="1"><span class="co"># saveRDS(model_long, &quot;final_long_model.rds&quot;)</span></a></code></pre></div>
+</div>
+<div id="latitude" class="section level4">
+<h4>Latitude</h4>
+<div class="sourceCode" id="cb46"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb46-1" title="1"><span class="co">#</span></a>
+<a class="sourceLine" id="cb46-2" title="2"><span class="kw">set.seed</span>(<span class="dv">1605</span>)</a>
+<a class="sourceLine" id="cb46-3" title="3">in_training &lt;-<span class="st"> </span><span class="kw">createDataPartition</span>(latTrainingData<span class="op">$</span>LATITUDE, <span class="dt">p =</span> <span class="fl">0.7</span>, <span class="dt">list =</span> F)</a>
+<a class="sourceLine" id="cb46-4" title="4"></a>
+<a class="sourceLine" id="cb46-5" title="5">wifi_train &lt;-<span class="st"> </span>latTrainingData[in_training,]</a>
+<a class="sourceLine" id="cb46-6" title="6">wifi_test &lt;-<span class="st"> </span>latTrainingData[<span class="op">-</span>in_training,]</a></code></pre></div>
+<div class="sourceCode" id="cb47"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb47-1" title="1"><span class="co"># tic(&quot;kNN&quot;)</span></a>
+<a class="sourceLine" id="cb47-2" title="2"><span class="co"># set.seed(1605)</span></a>
+<a class="sourceLine" id="cb47-3" title="3"><span class="co"># model_lat &lt;- train(LATITUDE ~ ., data = wifi_train, method = &quot;knn&quot;,</span></a>
+<a class="sourceLine" id="cb47-4" title="4"><span class="co">#                    preProcess = c(&#39;center&#39;, &#39;scale&#39;, &#39;zv&#39;, &#39;pca&#39;),</span></a>
+<a class="sourceLine" id="cb47-5" title="5"><span class="co">#                    trControl = fitControl)</span></a>
+<a class="sourceLine" id="cb47-6" title="6"><span class="co"># toc()</span></a>
+<a class="sourceLine" id="cb47-7" title="7"></a>
+<a class="sourceLine" id="cb47-8" title="8">model_lat &lt;-<span class="st"> </span><span class="kw">readRDS</span>(<span class="st">&quot;final_lat_model.rds&quot;</span>)</a>
+<a class="sourceLine" id="cb47-9" title="9"></a>
+<a class="sourceLine" id="cb47-10" title="10">pred &lt;-<span class="st"> </span><span class="kw">predict</span>(model_lat, <span class="dt">newdata =</span> wifi_test)</a>
+<a class="sourceLine" id="cb47-11" title="11"><span class="kw">postResample</span>(wifi_test<span class="op">$</span>LATITUDE, pred)</a></code></pre></div>
+<pre><code>##      RMSE  Rsquared       MAE 
+## 7.9881052 0.9856566 3.9215134</code></pre>
+<div class="sourceCode" id="cb49"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb49-1" title="1"><span class="co"># saveRDS(model_lat, &quot;final_lat_model.rds&quot;)</span></a></code></pre></div>
+</div>
+</div>
+<div id="validation" class="section level3">
+<h3>Validation</h3>
+<div id="convert-data-types-1" class="section level5">
+<h5>Convert data types</h5>
+<div class="sourceCode" id="cb50"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb50-1" title="1"><span class="co"># convert features to numeric</span></a>
+<a class="sourceLine" id="cb50-2" title="2">validationData &lt;-<span class="st"> </span><span class="kw">sapply</span>(validationData, as.numeric)</a>
+<a class="sourceLine" id="cb50-3" title="3">  </a>
+<a class="sourceLine" id="cb50-4" title="4">validationData &lt;-<span class="st"> </span><span class="kw">as_tibble</span>(validationData)</a></code></pre></div>
+</div>
+<div id="impute-nas-1" class="section level5">
+<h5>Impute NA’s</h5>
+<div class="sourceCode" id="cb51"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb51-1" title="1"><span class="co"># convert NA&#39;s to -110</span></a>
+<a class="sourceLine" id="cb51-2" title="2">validationData[validationData <span class="op">==</span><span class="st"> </span><span class="dv">100</span>] &lt;-<span class="st"> </span><span class="dv">-110</span></a></code></pre></div>
+</div>
+<div id="remove-features-and-rows-with-all-nas-1" class="section level5">
+<h5>Remove features and Rows with all NA’s</h5>
+<div class="sourceCode" id="cb52"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb52-1" title="1"><span class="co"># remove rows with all data is NA&#39;s</span></a>
+<a class="sourceLine" id="cb52-2" title="2">validationData &lt;-<span class="st"> </span>validationData[<span class="kw">rowSums</span>(validationData <span class="op">==</span><span class="st"> </span><span class="dv">-110</span>) <span class="op">!=</span><span class="st"> </span><span class="kw">ncol</span>(validationData), ]</a></code></pre></div>
+</div>
+<div id="create-unique-identifier-1" class="section level5">
+<h5>Create unique identifier</h5>
+<div class="sourceCode" id="cb53"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb53-1" title="1"><span class="co"># consolidate position identifiers to create location ID feature</span></a>
+<a class="sourceLine" id="cb53-2" title="2">validationData<span class="op">$</span>ID &lt;-<span class="st"> </span>validationData <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb53-3" title="3"><span class="st">  </span><span class="kw">group_indices</span>(BUILDINGID, FLOOR)</a></code></pre></div>
+<div class="sourceCode" id="cb54"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb54-1" title="1"><span class="co"># convert features to categorical</span></a>
+<a class="sourceLine" id="cb54-2" title="2">validationData &lt;-<span class="st"> </span>validationData <span class="op">%&gt;%</span><span class="st"> </span></a>
+<a class="sourceLine" id="cb54-3" title="3"><span class="st">  </span><span class="kw">mutate</span>(<span class="dt">BUILDINGID =</span> <span class="kw">as.factor</span>(BUILDINGID),</a>
+<a class="sourceLine" id="cb54-4" title="4">         <span class="dt">SPACEID =</span> <span class="kw">as.factor</span>(SPACEID),</a>
+<a class="sourceLine" id="cb54-5" title="5">         <span class="dt">RELATIVEPOSITION =</span> <span class="kw">as.factor</span>(RELATIVEPOSITION),</a>
+<a class="sourceLine" id="cb54-6" title="6">         <span class="dt">FLOOR =</span> <span class="kw">as.factor</span>(FLOOR),</a>
+<a class="sourceLine" id="cb54-7" title="7">         <span class="dt">ID =</span> <span class="kw">as.factor</span>(ID))</a></code></pre></div>
+</div>
+<div id="classification-4" class="section level4">
+<h4>Classification</h4>
+<div class="sourceCode" id="cb55"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb55-1" title="1"><span class="co"># remove unneeded features prior to model fitting</span></a>
+<a class="sourceLine" id="cb55-2" title="2">classValidationData &lt;-<span class="st"> </span>validationData <span class="op">%&gt;%</span><span class="st"> </span></a>
+<a class="sourceLine" id="cb55-3" title="3"><span class="st">  </span><span class="kw">select</span>(<span class="kw">starts_with</span>(<span class="st">&quot;WAP&quot;</span>), ID)</a></code></pre></div>
+<div class="sourceCode" id="cb56"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb56-1" title="1">pred_class &lt;-<span class="st"> </span><span class="kw">predict</span>(model_class, <span class="dt">newdata =</span> classValidationData)</a>
+<a class="sourceLine" id="cb56-2" title="2"><span class="kw">postResample</span>(classValidationData<span class="op">$</span>ID, pred_class)</a></code></pre></div>
+<pre><code>##  Accuracy     Kappa 
+## 0.7821782 0.7566355</code></pre>
+</div>
+<div id="regression-2" class="section level4">
+<h4>Regression</h4>
+<div class="sourceCode" id="cb58"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb58-1" title="1"><span class="co"># remove unneeded features prior to model fitting</span></a>
+<a class="sourceLine" id="cb58-2" title="2">longValidationData &lt;-<span class="st"> </span>validationData <span class="op">%&gt;%</span><span class="st"> </span></a>
+<a class="sourceLine" id="cb58-3" title="3"><span class="st">  </span><span class="kw">select</span>(<span class="kw">starts_with</span>(<span class="st">&quot;WAP&quot;</span>), LONGITUDE, FLOOR)</a>
+<a class="sourceLine" id="cb58-4" title="4"></a>
+<a class="sourceLine" id="cb58-5" title="5">latValidationData &lt;-<span class="st"> </span>validationData <span class="op">%&gt;%</span><span class="st"> </span></a>
+<a class="sourceLine" id="cb58-6" title="6"><span class="st">  </span><span class="kw">select</span>(<span class="kw">starts_with</span>(<span class="st">&quot;WAP&quot;</span>), LATITUDE, FLOOR)</a>
+<a class="sourceLine" id="cb58-7" title="7"></a>
+<a class="sourceLine" id="cb58-8" title="8"><span class="co"># apply validation dataset in the final models</span></a>
+<a class="sourceLine" id="cb58-9" title="9">pred_val_long &lt;-<span class="st"> </span><span class="kw">predict</span>(model_long, <span class="dt">newdata =</span> longValidationData)</a>
+<a class="sourceLine" id="cb58-10" title="10"><span class="kw">postResample</span>(longValidationData<span class="op">$</span>LONGITUDE, pred_val_long)</a></code></pre></div>
+<pre><code>##       RMSE   Rsquared        MAE 
+## 19.9410003  0.9725869  9.1614124</code></pre>
+<div class="sourceCode" id="cb60"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb60-1" title="1">pred_val_lat &lt;-<span class="st"> </span><span class="kw">predict</span>(model_lat, <span class="dt">newdata =</span> latValidationData)</a>
+<a class="sourceLine" id="cb60-2" title="2"><span class="kw">postResample</span>(latValidationData<span class="op">$</span>LATITUDE, pred_val_lat)</a></code></pre></div>
+<pre><code>##       RMSE   Rsquared        MAE 
+## 14.6779868  0.9567442  7.9800394</code></pre>
 </div>
 </div>
 </div>
