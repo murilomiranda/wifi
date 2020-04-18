@@ -371,15 +371,15 @@ wifi_test <- partTrainingData[-in_training,]
 
 ```{r}
 # apply SVM Linear algorithm
-tic("kNN")
-set.seed(1605)
-model_class <- train(ID ~ ., data = wifi_train, method = "svmLinear",
-                   preProcess = c('zv', 'pca'),
-                   tuneLength = 2,
-                   trControl = fitControl)
-toc()
+# tic("kNN")
+# set.seed(1605)
+# model_class <- train(ID ~ ., data = wifi_train, method = "svmLinear",
+#                    preProcess = c('zv', 'pca'),
+#                    tuneLength = 2,
+#                    trControl = fitControl)
+# toc()
 
-# model_class <- readRDS("final_class_model.rds")
+model_class <- readRDS("final_class_model.rds")
 
 pred_class <- predict(model_class, newdata = wifi_test)
 postResample(wifi_test$ID, pred_class)
@@ -418,15 +418,15 @@ wifi_test_long <- longTrainingData[-in_training,]
 ```
 
 ```{r}
-tic("kNN")
-set.seed(1605)
-model_long <- train(LONGITUDE ~ ., data = wifi_train_long, method = "knn",
-               preProcess = c('center', 'scale', 'zv', 'pca'),
-               tuneGrid = expand.grid(k = 1:10),
-               trControl = fitControl)
-toc()
+# tic("kNN")
+# set.seed(1605)
+# model_long <- train(LONGITUDE ~ ., data = wifi_train_long, method = "knn",
+#                preProcess = c('center', 'scale', 'zv', 'pca'),
+#                tuneGrid = expand.grid(k = 1:10),
+#                trControl = fitControl)
+# toc()
 
-# model_long <- readRDS("final_long_model.rds")
+model_long <- readRDS("final_long_model.rds")
 
 pred_long <- predict(model_long, newdata = wifi_test_long)
 postResample(wifi_test_long$LONGITUDE, pred_long)
@@ -442,15 +442,15 @@ wifi_test_lat <- latTrainingData[-in_training,]
 ```
 
 ```{r}
-tic("kNN")
-set.seed(1605)
-model_lat <- train(LATITUDE ~ ., data = wifi_train_lat, method = "knn",
-                   preProcess = c('center', 'scale', 'zv', 'pca'),
-                   tuneGrid = expand.grid(k = 1:10),
-                   trControl = fitControl)
-toc()
+# tic("kNN")
+# set.seed(1605)
+# model_lat <- train(LATITUDE ~ ., data = wifi_train_lat, method = "knn",
+#                    preProcess = c('center', 'scale', 'zv', 'pca'),
+#                    tuneGrid = expand.grid(k = 1:10),
+#                    trControl = fitControl)
+# toc()
 
-# model_lat <- readRDS("final_lat_model.rds")
+model_lat <- readRDS("final_lat_model.rds")
 
 pred_lat <- predict(model_lat, newdata = wifi_test_lat)
 postResample(wifi_test_lat$LATITUDE, pred_lat)
@@ -541,135 +541,137 @@ postResample(latValidationData$LATITUDE, pred_val_lat)
 data_hypo <- sqrt(validationData$LONGITUDE^2 + validationData$LATITUDE^2)
 vali_hypo <- sqrt(pred_val_long^2 + pred_val_lat^2)
 
-plot(data_hypo, vali_hypo)
+plot(data_hypo, vali_hypo, xlab = "Observed location", ylab = "Predicted location")
+abline(0, 1, col = "red", lty = 2)
 cbind("RMSE" = RMSE(data_hypo, vali_hypo), "Rsquared" = cor(data_hypo, vali_hypo)^2, 
       "MAE" = MAE(data_hypo, vali_hypo))
 ```
 
-## Ensemble Models
-### Set some parameters up
-```{r}
-# define parameters in trainControl
-fitControl <- trainControl(method = "cv", 
-                           number = 5, 
-                           savePredictions = 'final')
-```
+<!-- ## Ensemble Models -->
+<!-- ### Set some parameters up -->
+<!-- ```{r} -->
+<!-- # define parameters in trainControl -->
+<!-- fitControl <- trainControl(method = "cv",  -->
+<!--                            number = 5,  -->
+<!--                            savePredictions = 'final') -->
+<!-- ``` -->
 
-### Part of the dataset (10%)
-```{r}
-# Randomly select - sample fixed fraction per group
-set.seed(1605)
-longTrainingData <- longTrainingData %>% sample_frac(size = 0.1)
+<!-- ### Part of the dataset (10%) -->
+<!-- ```{r} -->
+<!-- # Randomly select - sample fixed fraction per group -->
+<!-- set.seed(1605) -->
+<!-- longTrainingData <- longTrainingData %>% sample_frac(size = 0.1) -->
 
-set.seed(1605)
-latTrainingData <- latTrainingData %>% sample_frac(size = 0.1)
-```
-### Regression
-#### Longitude
-```{r}
+<!-- set.seed(1605) -->
+<!-- latTrainingData <- latTrainingData %>% sample_frac(size = 0.1) -->
+<!-- ``` -->
 
-set.seed(1605)
-in_training <- createDataPartition(longTrainingData$LONGITUDE, p = 0.7, list = F)
+<!-- ### Regression -->
+<!-- #### Longitude -->
+<!-- ```{r} -->
 
-wifi_train <- longTrainingData[in_training,]
-wifi_test <- longTrainingData[-in_training,]
-```
+<!-- set.seed(1605) -->
+<!-- in_training <- createDataPartition(longTrainingData$LONGITUDE, p = 0.7, list = F) -->
 
-```{r}
-# kNN
-pred_long <- c()
-tic()
-set.seed(1605)
-model_knn <- train(LONGITUDE ~ ., data = wifi_train, method = "knn",
-               preProcess = c('center', 'scale', 'zv', 'pca'),
-               trControl = fitControl)
-toc()
+<!-- wifi_train <- longTrainingData[in_training,] -->
+<!-- wifi_test <- longTrainingData[-in_training,] -->
+<!-- ``` -->
 
-pred_long$knn <- predict(model_knn, wifi_test)
-postResample(wifi_test$LONGITUDE, pred_long$knn)
+<!-- ```{r} -->
+<!-- # kNN -->
+<!-- pred_long <- c() -->
+<!-- tic() -->
+<!-- set.seed(1605) -->
+<!-- model_knn <- train(LONGITUDE ~ ., data = wifi_train, method = "knn", -->
+<!--                preProcess = c('center', 'scale', 'zv', 'pca'), -->
+<!--                trControl = fitControl) -->
+<!-- toc() -->
 
-# Random Forest
-tic()
-set.seed(1605)
-model_rf <- train(LONGITUDE ~ ., data = wifi_train, method = "ranger",
-               preProcess = c('center', 'scale', 'zv', 'pca'),
-               trControl = fitControl)
-toc()
+<!-- pred_long$knn <- predict(model_knn, wifi_test) -->
+<!-- postResample(wifi_test$LONGITUDE, pred_long$knn) -->
 
-pred_long$rf <- predict(model_rf, wifi_test)
-postResample(wifi_test$LONGITUDE, pred_long$rf)
+<!-- # Random Forest -->
+<!-- tic() -->
+<!-- set.seed(1605) -->
+<!-- model_rf <- train(LONGITUDE ~ ., data = wifi_train, method = "ranger", -->
+<!--                preProcess = c('center', 'scale', 'zv', 'pca'), -->
+<!--                trControl = fitControl) -->
+<!-- toc() -->
 
-# Generalized Boosted Models
-tic()
-set.seed(1605)
-model_gbm <- train(LONGITUDE ~ ., data = wifi_train, method = "gbm",
-               preProcess = c('center', 'scale', 'zv', 'pca'),
-               trControl = fitControl)
-toc()
+<!-- pred_long$rf <- predict(model_rf, wifi_test) -->
+<!-- postResample(wifi_test$LONGITUDE, pred_long$rf) -->
 
-pred_long$gbm <- predict(model_gbm, wifi_test)
-postResample(wifi_test$LONGITUDE, pred_long$gbm)
+<!-- # Generalized Boosted Models -->
+<!-- tic() -->
+<!-- set.seed(1605) -->
+<!-- model_gbm <- train(LONGITUDE ~ ., data = wifi_train, method = "gbm", -->
+<!--                preProcess = c('center', 'scale', 'zv', 'pca'), -->
+<!--                trControl = fitControl) -->
+<!-- toc() -->
 
-## Averaging
-postResample(wifi_test$LONGITUDE, rowMeans(as.data.frame(pred_long)))
+<!-- pred_long$gbm <- predict(model_gbm, wifi_test) -->
+<!-- postResample(wifi_test$LONGITUDE, pred_long$gbm) -->
 
-## Stacking
-train_topLayer <- c()
-train_topLayer$LONGITUDE <- model_knn$pred$obs[order(model_knn$pred$rowIndex)]
-train_topLayer$knn <- model_knn$pred$pred[order(model_knn$pred$rowIndex)]
-train_topLayer$rf <- model_rf$pred$pred[order(model_rf$pred$rowIndex)]
-train_topLayer$gbm <- model_gbm$pred$pred[order(model_gbm$pred$rowIndex)]
+<!-- ## Averaging -->
+<!-- postResample(wifi_test$LONGITUDE, rowMeans(as.data.frame(pred_long))) -->
 
-train_topLayer <- as.data.frame(train_topLayer)
+<!-- ## Stacking -->
+<!-- train_topLayer <- c() -->
+<!-- train_topLayer$LONGITUDE <- model_knn$pred$obs[order(model_knn$pred$rowIndex)] -->
+<!-- train_topLayer$knn <- model_knn$pred$pred[order(model_knn$pred$rowIndex)] -->
+<!-- train_topLayer$rf <- model_rf$pred$pred[order(model_rf$pred$rowIndex)] -->
+<!-- train_topLayer$gbm <- model_gbm$pred$pred[order(model_gbm$pred$rowIndex)] -->
 
-test_topLayer <- c()
-test_topLayer$knn <- predict(model_knn, wifi_test)
-test_topLayer$rf <- predict(model_rf, wifi_test)
-test_topLayer$gbm <- predict(model_gbm, wifi_test)
+<!-- train_topLayer <- as.data.frame(train_topLayer) -->
 
-test_topLayer <- as.data.frame(test_topLayer)
+<!-- test_topLayer <- c() -->
+<!-- test_topLayer$knn <- predict(model_knn, wifi_test) -->
+<!-- test_topLayer$rf <- predict(model_rf, wifi_test) -->
+<!-- test_topLayer$gbm <- predict(model_gbm, wifi_test) -->
 
-# Top model - GBM
-model_top_gbm <- train(LONGITUDE ~ ., data = train_topLayer, method = "gbm",
-                        preProcess = c('center', 'scale', 'zv', 'pca'),
-                       trControl = fitControl, tuneLength = 3)
+<!-- test_topLayer <- as.data.frame(test_topLayer) -->
 
-predict(model_top_gbm, test_topLayer)
-```
+<!-- # Top model - GBM -->
+<!-- model_top_gbm <- train(LONGITUDE ~ ., data = train_topLayer, method = "gbm", -->
+<!--                         preProcess = c('center', 'scale', 'zv', 'pca'), -->
+<!--                        trControl = fitControl, tuneLength = 3) -->
 
-##### Latitude
-```{r}
-#
-set.seed(1605)
-in_training <- createDataPartition(latTrainingData$LATITUDE, p = 0.7, list = F)
+<!-- predict(model_top_gbm, test_topLayer) -->
+<!-- ``` -->
 
-wifi_train <- latTrainingData[in_training,]
-wifi_test <- latTrainingData[-in_training,]
-```
+<!-- ##### Latitude -->
+<!-- ```{r} -->
+<!-- # -->
+<!-- set.seed(1605) -->
+<!-- in_training <- createDataPartition(latTrainingData$LATITUDE, p = 0.7, list = F) -->
 
-```{r}
-# methods <- c("knn", "rpart", "ranger", "svmLinear", "svmRadial", "gbm")
-# 
-# compare_lat <- c()
-# 
-# tic("Total")
-# for(i in methods){
-#   tic(paste("Method", i))
-#   set.seed(1605)
-#   model <- train(LATITUDE ~ ., data = wifi_train, method = i, 
-#                  preProcess = c('center', 'scale', 'zv', 'pca'),
-#                  trControl = fitControl)
-#   
-#   pred <- predict(model, newdata = wifi_test)
-#   pred_metric <- postResample(wifi_test$LATITUDE, pred)
-#   compare_lat <- cbind(compare_lat, pred_metric)
-#   toc()
-# }
-# toc()
-# 
-# colnames(compare_lat) <- methods
+<!-- wifi_train <- latTrainingData[in_training,] -->
+<!-- wifi_test <- latTrainingData[-in_training,] -->
+<!-- ``` -->
 
-# saveRDS(compare_lat, "compare_lat.rds")
-```
+<!-- ```{r} -->
+<!-- # methods <- c("knn", "rpart", "ranger", "svmLinear", "svmRadial", "gbm") -->
+<!-- #  -->
+<!-- # compare_lat <- c() -->
+<!-- #  -->
+<!-- # tic("Total") -->
+<!-- # for(i in methods){ -->
+<!-- #   tic(paste("Method", i)) -->
+<!-- #   set.seed(1605) -->
+<!-- #   model <- train(LATITUDE ~ ., data = wifi_train, method = i,  -->
+<!-- #                  preProcess = c('center', 'scale', 'zv', 'pca'), -->
+<!-- #                  trControl = fitControl) -->
+<!-- #    -->
+<!-- #   pred <- predict(model, newdata = wifi_test) -->
+<!-- #   pred_metric <- postResample(wifi_test$LATITUDE, pred) -->
+<!-- #   compare_lat <- cbind(compare_lat, pred_metric) -->
+<!-- #   toc() -->
+<!-- # } -->
+<!-- # toc() -->
+<!-- #  -->
+<!-- # colnames(compare_lat) <- methods -->
+
+<!-- # saveRDS(compare_lat, "compare_lat.rds") -->
+<!-- ``` -->
 
 
